@@ -13,7 +13,12 @@ last_alert = None
 def get_gold_price():
     url = f"https://api.metals.dev/v1/latest?api_key={API_KEY}&base=USD&symbols=XAU"
     r = requests.get(url).json()
-    return float(r["metals"]["XAU"])
+
+    if "metals" in r and "XAU" in r["metals"]:
+        return float(r["metals"]["XAU"])
+    else:
+        print("API Error:", r)
+        return None
 
 def send_message(chat_id, text):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
@@ -30,7 +35,11 @@ def webhook():
 
         if text.lower() == "prix":
             price = get_gold_price()
-            send_message(chat_id, f"💰 Gold price now: {price}$")
+
+            if price:
+                send_message(chat_id, f"💰 Gold price now: {price}$")
+            else:
+                send_message(chat_id, "⚠️ Error getting gold price.")
 
     return "ok"
 
@@ -40,22 +49,23 @@ def check_price():
         try:
             price = get_gold_price()
 
-            if price <= 4600 and last_alert != "down":
-                for u in users:
-                    send_message(u, "📉 Gold dropped!")
-                last_alert = "down"
+            if price:
+                if price <= 4600 and last_alert != "down":
+                    for u in users:
+                        send_message(u, "📉 Gold dropped!")
+                    last_alert = "down"
 
-            elif price >= 5600 and last_alert != "up":
-                for u in users:
-                    send_message(u, "📈 Gold is rising!")
-                last_alert = "up"
+                elif price >= 5600 and last_alert != "up":
+                    for u in users:
+                        send_message(u, "📈 Gold is rising!")
+                    last_alert = "up"
 
-        except:
-            pass
+        except Exception as e:
+            print("Error:", e)
 
         time.sleep(300)
 
 if __name__ == "__main__":
     import threading
     threading.Thread(target=check_price).start()
-    app.run(host="0.0.0.0", port=10000)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
