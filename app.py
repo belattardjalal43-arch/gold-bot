@@ -11,11 +11,11 @@ users = set()
 last_alert = None
 
 def get_gold_price():
-    url = f"https://api.metals.dev/v1/latest?api_key={API_KEY}&base=USD&symbols=XAU"
+    url = f"https://api.metals.dev/v1/latest?api_key={API_KEY}&base=USD"
     r = requests.get(url).json()
 
-    if "metals" in r and "XAU" in r["metals"]:
-        return float(r["metals"]["XAU"])
+    if "gold" in r:
+        return float(r["gold"])
     else:
         print("API Error:", r)
         return None
@@ -28,6 +28,7 @@ def send_message(chat_id, text):
 def webhook():
     global users
     data = request.json
+
     if "message" in data:
         chat_id = data["message"]["chat"]["id"]
         text = data["message"].get("text", "")
@@ -37,7 +38,7 @@ def webhook():
             price = get_gold_price()
 
             if price:
-                send_message(chat_id, f"💰 Gold price now: {price}$")
+                send_message(chat_id, f"💰 Gold price now: {price}$ per ounce")
             else:
                 send_message(chat_id, "⚠️ Error getting gold price.")
 
@@ -50,12 +51,12 @@ def check_price():
             price = get_gold_price()
 
             if price:
-                if price <= 4600 and last_alert != "down":
+                if price <= 2900 and last_alert != "down":
                     for u in users:
                         send_message(u, "📉 Gold dropped!")
                     last_alert = "down"
 
-                elif price >= 5600 and last_alert != "up":
+                elif price >= 3000 and last_alert != "up":
                     for u in users:
                         send_message(u, "📈 Gold is rising!")
                     last_alert = "up"
