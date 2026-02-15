@@ -10,7 +10,7 @@ app = Flask(__name__)
 users = set()
 last_alert = None
 
-# 🔹 Route عادي باش السيرفر ما يطيحش
+# ✅ Route باش Render يبقى صاحي
 @app.route("/")
 def home():
     return "Bot is running ✅"
@@ -18,7 +18,12 @@ def home():
 def get_gold_price():
     url = f"https://api.metals.dev/v1/latest?api_key={API_KEY}&base=USD"
     r = requests.get(url).json()
-    return float(r["gold"])
+
+    if "gold" in r:
+        return float(r["gold"])
+    else:
+        print("API error:", r)
+        return None
 
 def send_message(chat_id, text):
     url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
@@ -27,7 +32,10 @@ def send_message(chat_id, text):
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
     global users
+
     data = request.json
+    if not data:
+        return "no data"
 
     if "message" in data:
         chat_id = data["message"]["chat"]["id"]
@@ -35,10 +43,10 @@ def webhook():
         users.add(chat_id)
 
         if text.lower() == "prix":
-            try:
-                price = get_gold_price()
+            price = get_gold_price()
+            if price:
                 send_message(chat_id, f"💰 Gold price now: {price}$ per ounce")
-            except:
+            else:
                 send_message(chat_id, "⚠️ Error getting gold price.")
 
     return "ok"
@@ -49,15 +57,16 @@ def check_price():
         try:
             price = get_gold_price()
 
-            if price <= 2900 and last_alert != "down":
-                for u in users:
-                    send_message(u, "📉 Gold dropped!")
-                last_alert = "down"
+            if price:
+                if price <= 2900 and last_alert != "down":
+                    for u in users:
+                        send_message(u, "📉 Gold dropped!")
+                    last_alert = "down"
 
-            elif price >= 3000 and last_alert != "up":
-                for u in users:
-                    send_message(u, "📈 Gold is rising!")
-                last_alert = "up"
+                elif price >= 3000 and last_alert != "up":
+                    for u in users:
+                        send_message(u, "📈 Gold is rising!")
+                    last_alert = "up"
 
         except Exception as e:
             print("Error:", e)
@@ -66,5 +75,10 @@ def check_price():
 
 if __name__ == "__main__":
     import threading
-    threading.Thread(target=check_price).start()
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+
+    t = threading.Thread(target=check_price)
+    t.daemon = True   # مهم باش ما يوقفش السيرفر
+    t.start()
+
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
